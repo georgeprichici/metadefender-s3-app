@@ -1,0 +1,214 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'metadefender-s3-app
+
+  Sample SAM Template for metadefender-s3-app
+
+  '
+Globals:
+  Function:
+    Timeout: 30
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+    - Label:
+        default: 'MetaDefender deployment'
+      Parameters: 
+      - MetaDefenderDeployment
+      - MetaDefenderCloud
+      - MetaDefenderCore        
+    - Label:
+        default: 'Analysis config'
+      Parameters:
+      - RemediationType
+      - ReportInfectedFiles
+      - EnableBucketVersioning
+    ParameterLabels:
+      MetaDefenderDeployment:
+        default: "Analyze files with"
+      MetaDefenderCloud:
+        default: "MetaDefender Cloud"
+      MetaDefenderCore: 
+        default: "MetaDefender Core"
+      RemediationType:
+        default: "Remediation Type"
+      ReportInfectedFiles: 
+        default: "Report Infected Files"
+      EnableBucketVersioning: 
+        default: "Enable bucket versioning to allow replacing original file with sanitized file"
+    
+Parameters:
+  RemediationType:
+    Description: 'Select how would you like to handle file analysis (delete infected files, always sanitize or just report)'
+    Type: String
+    Default: Tag
+    AllowedValues:
+    - Tag
+    - Delete 
+    - Sanitize
+  ReportInfectedFiles:
+    Description: 'Report infected files to the SNS topic'
+    Type: String
+    Default: false
+    AllowedValues:
+    - true
+    - false
+  MetaDefenderDeployment:
+    Description: 'Select which MetaDefender deployment will be used for analysis'
+    Type: String
+    Default: MetaDefenderCloud
+    AllowedValues:
+    - MetaDefenderCloud
+    - MetaDefenderCore
+  EnableBucketVersioning:
+    Description: 'Enable bucket versioning to allow replacing original file with sanitized file'
+    Type: String
+    Default: false
+    AllowedValues:
+    - true
+    - false
+  MetaDefenderCore:
+    Description: 'Provide MetaDefender Core URL for file submission (e.g. https://instance.domain.com:8008)'
+    Type: String
+  MetaDefenderCloud:
+    Description: 'Provide MetaDefender Cloud APIkey'
+    Type: String    
+Conditions: 
+  CreateProdResources: !Equals [ !Ref MetaDefenderDeployment, MetaDefenderCloud ]
+
+Resources:
+  MetaDefenderAnalysisSNSTopic:
+    Type: 'AWS::SNS::Topic'
+    Properties: {}
+  MetaDefenderSubmitFileFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: MetaDefenderSubmitFileFunction
+      Description: Analyze all new files submitted to defined S3 bucket with MetaDefender
+      CodeUri: src/
+      Handler: handleS3Event.handler
+      Runtime: python3.7
+      Timeout: 60
+      Role: !GetAtt MetaDefenderSubmitFileLambdaRole.Arn
+      # Events:
+      #   CreateS3ObjectEvent:
+      #     Type: S3
+      #     Properties:
+      #       Bucket:
+      #         Ref: SrcBucket
+      #       Events: s3:ObjectCreated:*
+      Environment:
+        Variables:
+          MetaDefenderDeployment: !Ref MetaDefenderDeployment
+          MetaDefenderCoreURL: !Ref MetaDefenderCore
+          MetaDefenderCloudAPIkey: !Ref MetaDefenderCloud
+          AnalysisComplateCallback: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/callback"    
+  AnalysisCallbackFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: AnalysisCallbackFunction
+      Description: Callback webhook used by MetaDefender to notify the analysis result
+      CodeUri: src/
+      Handler: analysisCallback.handler
+      Runtime: python3.7
+      Timeout: 30
+      Role: !GetAtt S3RemediationLambdaRole.Arn
+      Events:
+        AnalysisCallbackAPIEvent:
+          Type: Api
+          Properties:
+            Path: /callback
+            Method: post
+      Environment:
+        Variables:
+          RemediationType: !Ref RemediationType
+          ReportInfectedFiles: !Ref ReportInfectedFiles
+          EnableBucketVersioning: !Ref EnableBucketVersioning
+          SNSTopic: !Ref MetaDefenderAnalysisSNSTopic          
+    DependsOn: S3RemediationLambdaRole
+  MetaDefenderSubmitFileLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal: {Service: [lambda.amazonaws.com]}
+          Action: ['sts:AssumeRole']
+      Path: /
+      ManagedPolicyArns:
+      - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+      - PolicyName: MetaDefenderAnalysisS3Policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:GetObjectVersionTagging
+                - s3:GetObjectTagging
+                - s3:GetObjectVersion
+              Resource: "*"           
+  S3RemediationLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal: {Service: [lambda.amazonaws.com]}
+          Action: ['sts:AssumeRole']
+      Path: /
+      ManagedPolicyArns:
+      - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+      - PolicyName: MetaDefenderAnalysisS3Policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                - S3:DeleteObject
+                - s3:DeleteObjectTagging
+                - s3:PutObject
+                - s3:GetObject
+                - s3:DeleteObjectVersion
+                - s3:GetObjectVersionTagging
+                - s3:ReplicateTags
+                - s3:PutObjectVersionTagging
+                - s3:GetObjectTagging
+                - s3:PutObjectTagging
+                - s3:DeleteObjectVersionTagging
+                - s3:DeleteObject
+                - s3:GetObjectVersion
+              Resource: "*"              
+      - PolicyName: MetaDefenderAnalysisNotifPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action: 'sns:Publish'
+            Resource: !Ref MetaDefenderAnalysisSNSTopic
+    DependsOn: MetaDefenderAnalysisSNSTopic
+
+Outputs:
+  MetaDefenderSubmitFileFunction:
+    Description: MetaDefenderSubmitFileFunction Lambda Function ARN
+    Value:
+      Fn::GetAtt:
+      - MetaDefenderSubmitFileFunction
+      - Arn
+  MetaDefenderSubmitFileFunctionIamRole:
+    Description: Implicit IAM Role created for Submit File function
+    Value:
+      Fn::GetAtt:
+      - MetaDefenderSubmitFileFunction
+      - Arn
+  S3RemediationLambdaRole:
+    Description: Implicit IAM Role created for AnalysisResults function
+    Value:
+      Fn::GetAtt:
+      - S3RemediationLambdaRole
+      - Arn
