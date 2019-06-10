@@ -1,5 +1,7 @@
 # metadefender-s3-app
 
+## Summary
+
 This is a sample template for metadefender-s3-app:
 - Analyze all new files uploaded to an S3 bucket with MetaDefender Cloud or Core
 - S3 event is triggered when a file is uploaded to the S3 bucket, which will call the handleS3Event.handler
@@ -11,10 +13,35 @@ This is a sample template for metadefender-s3-app:
       - analysisTimestamp
       - metaDefenderResult
     - Deleted: for all infected files
-    - Sanitized: not yet supported
+    - Sanitized: not yet implemented
 - Alerting is also available for all infected files detected:
   - SNS integration available, a new topic will be created
   - user should subscribe to the topic
+
+## Deploy in AWS
+
+### CloudFormation
+
+* Create a new Stack in CloudFormation
+   * Upload the provided CloudFormation template (packaged version after you call ``` sam package ``` command
+   * Fill the form with the requirement details:
+      * <img src="https://md-test-doc.s3-us-west-2.amazonaws.com/metadefender-s3-cloudformation-form.png" width="50%" height="50%"> 
+      * Select which deployment you would like to use (Cloud or Core)
+      * Provide the MetaDefender Cloud APIkey or the location of the MetaDefender Core instance
+         * For MetaDefender Cloud APIkey go to https://metadefender.opswat.com, register and you will be able to retrieve the APIkey from your profile
+   * Go through the wizzard and create the Stack
+* Map the S3 bucket Event to the new Lambda function
+   * Go to your bucket Properties section and select Events
+   *  <img src="https://md-test-doc.s3-us-west-2.amazonaws.com/metadefender-s3-bucket-event-setup.png" width="50%" height="50%">
+   * Select Lambda function and then MetaDefenderSubmitFilesFunction to handle all the `ObjectCreation` events
+* Upload the `eicar file` to test the detection 
+   * The current selection for remediation is Tag only:
+   * <img src="https://md-test-doc.s3-us-west-2.amazonaws.com/metadefender-s3-bucket-tags.png" width="50%" height="50%"> 
+   
+* Notification of infected file can also be sent via SNS (in this case email subscription was enabled):
+   * <img src="https://md-test-doc.s3-us-west-2.amazonaws.com/metadefender-sns-notif.png" width="50%" height="50%"> 
+
+## Code structure
 
 ```bash
 .
@@ -58,18 +85,18 @@ sam local invoke MetaDefenderSubmitFileFunction --event ./tests/s3-event.json
 sam local start-api
 ```
 
-If the previous command ran successfully you should now be able to hit the following local endpoint to invoke your function `http://localhost:3000/hello`
+If the previous command ran successfully you should now be able to hit the following local endpoint to invoke your function `http://localhost:3000/callback`
 
-**SAM CLI** is used to emulate both Lambda and API Gateway locally and uses our `template.yaml` to understand how to bootstrap this environment (runtime, where the source code is, etc.) - The following excerpt is what the CLI will read in order to initialize an API and its routes:
+**SAM CLI** is used to emulate both Lambda and API Gateway locally and uses our `metadefender-s3-template.yaml` to understand how to bootstrap this environment (runtime, where the source code is, etc.) - The following excerpt is what the CLI will read in order to initialize an API and its routes:
 
 ```yaml
 ...
 Events:
-    HelloWorld:
+    AnalysisCallbackFunction:
         Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
-        Properties:
-            Path: /hello
-            Method: get
+          Properties:
+            Path: /callback
+            Method: post
 ```
 
 ## Packaging and deployment
@@ -78,10 +105,12 @@ AWS Lambda Python runtime requires a flat folder with all dependencies including
 
 ```yaml
 ...
-    HelloWorldFunction:
-        Type: AWS::Serverless::Function
-        Properties:
-            CodeUri: hello_world/
+    MetaDefenderSubmitFileFunction:
+      Type: AWS::Serverless::Function
+      Properties:
+        FunctionName: MetaDefenderSubmitFileFunction
+        Description: Analyze all new files submitted to defined S3 bucket with MetaDefender
+        CodeUri: src/
             ...
 ```
 
@@ -116,7 +145,7 @@ After deployment is complete you can run the following command to retrieve the A
 ```bash
 aws cloudformation describe-stacks \
     --stack-name metadefender-s3-app \
-    --query 'Stacks[].Outputs[?OutputKey==`HelloWorldApi`]' \
+    --query 'Stacks[].Outputs[?OutputKey==`AnalysisCallbackAPI`]' \
     --output table
 ``` 
 
@@ -127,7 +156,7 @@ To simplify troubleshooting, SAM CLI has a command called sam logs. sam logs let
 `NOTE`: This command works for all AWS Lambda functions; not just the ones you deploy using SAM.
 
 ```bash
-sam logs -n HelloWorldFunction --stack-name metadefender-s3-app --tail
+sam logs -n MetaDefenderSubmitFileFunction --stack-name metadefender-s3-app --tail
 ```
 
 You can find more information and examples about filtering Lambda function logs in the [SAM CLI Documentation](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-logging.html).
@@ -158,7 +187,7 @@ Here are a few things you can try to get more acquainted with building serverles
 
 * Uncomment lines on `app.py`
 * Build the project with ``sam build --use-container``
-* Invoke with ``sam local invoke HelloWorldFunction --event event.json``
+* Invoke with ``sam local invoke MetaDefenderSubmitFileFunction --event s3-event.json``
 * Update tests
 
 ### Create an additional API resource
@@ -199,7 +228,7 @@ All commands used throughout this document
 sam local generate-event apigateway aws-proxy > event.json
 
 # Invoke function locally with event.json as an input
-sam local invoke HelloWorldFunction --event event.json
+sam local invoke MetaDefenderSubmitFileFunction --event s3-event.json
 
 # Run API Gateway locally
 sam local start-api
@@ -221,10 +250,10 @@ sam deploy \
 # Describe Output section of CloudFormation stack previously created
 aws cloudformation describe-stacks \
     --stack-name metadefender-s3-app \
-    --query 'Stacks[].Outputs[?OutputKey==`HelloWorldApi`]' \
+    --query 'Stacks[].Outputs[?OutputKey==`AnalysisCallbackAPI`]' \
     --output table
 
 # Tail Lambda function Logs using Logical name defined in SAM Template
-sam logs -n HelloWorldFunction --stack-name metadefender-s3-app --tail
+sam logs -n MetaDefenderSubmitFileFunction --stack-name metadefender-s3-app --tail
 ```
 
