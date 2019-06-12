@@ -49,7 +49,7 @@ This is a sample template for metadefender-s3-app:
 ├── src                            <-- Source code for a lambda function
 │   ├── __init__.py
 │   ├── analysisCallback.py        <-- Lambda function responsible of handling the callback from MetaDefender
-│   ├── handleS3Event.py           <-- Labmbda function which will submit to MetaDefender all the new uploaded files to any attached S3 bucket
+│   ├── handleS3Event.py           <-- Lambda function which will submit to MetaDefender all the new uploaded files to any attached S3 bucket
 │   └── api                     
 │       ├── metadefenderCloud.py   <-- MetaDefender Cloud integration for the file API
 │       ├── metedefenderCore.py    <-- MetaDefender Core integration for the file API
