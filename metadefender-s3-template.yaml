@@ -102,7 +102,7 @@ Resources:
           MetaDefenderDeployment: !Ref MetaDefenderDeployment
           MetaDefenderCoreURL: !Ref MetaDefenderCore
           MetaDefenderCloudAPIkey: !Ref MetaDefenderCloud
-          AnalysisComplateCallback: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/callback"    
+          AnalysisCompleteCallback: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/callback"    
   AnalysisCallbackFunction:
     Type: AWS::Serverless::Function
     Properties:
