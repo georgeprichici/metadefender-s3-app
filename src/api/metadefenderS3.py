@@ -26,5 +26,8 @@ class MetaDefenderS3:
     def download_file(self, obj_key, download_path):
         self.s3_client.download_file(self.bucket_name, obj_key, download_path)
 
+    def generate_presigned_url(self, bucket, key):
+        return self.s3_client.generate_presigned_url( ClientMethod='get_object', Params={ 'Bucket': bucket, 'Key': key } )
+        
     def delete_file(self, filename):
         self.s3_client.delete_object(Bucket=self.bucket_name, Key=filename)
