@@ -85,7 +85,7 @@ class MetaDefenderCoreAPI:
             else:
                 print("Unexpected response from MetaDefender: {0}".format(response))
         
-        return json_response
+        return response
 
 
     def retrieve_sanitized_file(self, sanitized_file_url):
