@@ -25,6 +25,10 @@ class MetaDefenderCoreAPI:
 
     def __init__(self, url):
         self.server_url = url
+    
+    @property
+    def supports_dowload_file(self):
+        return False
 
     def submit_file(self, filename, filepath, analysis_callback_url):  
         json_response = {"error": "file not available"}   
@@ -32,26 +36,26 @@ class MetaDefenderCoreAPI:
         print("Submit file > filename:{0} @ path: {1}".format(filename, filepath))   
 
         with open(filepath, 'rb') as payload:
-                print("file read successfully")   
-                headers = {
-                    "filename": filename
-                }
-                before_submission = datetime.datetime.now()                
-                endpoint_details = self.api_endpoints["submit_file"]
-                metadefender_url = self.server_url + endpoint_details["endpoint"]
+            print("file read successfully")   
+            headers = {
+                "filename": filename
+            }
+            before_submission = datetime.datetime.now()                
+            endpoint_details = self.api_endpoints["submit_file"]
+            metadefender_url = self.server_url + endpoint_details["endpoint"]
 
-                print("File sent to MetaDefender")   
-                response = requests.request(endpoint_details["type"], metadefender_url, data=payload, headers=headers, timeout=(2,30))
-                json_response = json.loads(response.text)
-                
-                print("MetaDefender response: {0}".format(json_response))   
+            print("File sent to MetaDefender")   
+            response = requests.request(endpoint_details["type"], metadefender_url, data=payload, headers=headers, timeout=(2,30))
+            json_response = json.loads(response.text)
+            
+            print("MetaDefender response: {0}".format(json_response))   
 
-                http_status = response.status_code                           
-                total_submission_time = datetime.datetime.now() - before_submission
+            http_status = response.status_code                           
+            total_submission_time = datetime.datetime.now() - before_submission
 
-                print("{timestamp} {name} >> time: {total_time}, http status: {status}, response: {id}".format(timestamp=before_submission, name=filename, total_time=total_submission_time, status=http_status, id=response.text))                
+            print("{timestamp} {name} >> time: {total_time}, http status: {status}, response: {id}".format(timestamp=before_submission, name=filename, total_time=total_submission_time, status=http_status, id=response.text))                
 
-                json_response["status"] = "ok" if ('data_id' in json_response) else "failed"
+            json_response["status"] = "ok" if ('data_id' in json_response) else "failed"
 
         if "data_id" not in json_response:
             return {"error": json_response["error"]}
