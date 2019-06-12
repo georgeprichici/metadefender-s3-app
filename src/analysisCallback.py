@@ -1,7 +1,7 @@
 import json
 import os
 import boto3
-from metadefenderS3 import MetaDefenderS3
+from api.metadefenderS3 import MetaDefenderS3
 
 def tag_files(bucket, filename, analysis_results):
 
