@@ -19,7 +19,7 @@ class MetaDefenderCoreAPI:
         },
         "sanitized_file": {
             "type": "get",
-            "endpoint": "/file/sanitized/"
+            "endpoint": "/file/converted/{data_id}"
         }
     }
 
@@ -88,5 +88,13 @@ class MetaDefenderCoreAPI:
         return response
 
 
-    def retrieve_sanitized_file(self, sanitized_file_url):
-        return
+    def retrieve_sanitized_file(self, data_id):
+        endpoint_details = self.api_endpoints["sanitized_file"]
+        metadefender_url = self.server_url + endpoint_details["endpoint"].format(data_id=data_id)
+
+        print("Retrieve sanitized file ({0}) from MetaDefender".format(data_id))   
+        
+        response = requests.request(endpoint_details["type"], metadefender_url)
+        raw_file = response.text
+        
+        return raw_file
