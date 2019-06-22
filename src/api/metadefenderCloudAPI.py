@@ -39,7 +39,8 @@ class MetaDefenderCloudAPI:
             "filename": filename,
             "callbackurl": analysis_callback_url,
             "apikey": self.apikey,
-            "content-type": "application/octet-stream"
+            "content-type": "application/octet-stream",            
+            "rule": "sanitize"
         }
         
         before_submission = datetime.datetime.now()                
@@ -67,5 +68,13 @@ class MetaDefenderCloudAPI:
         return json_response
 
 
-    def retrieve_sanitized_file(self, sanitized_file_url):
-        return
+    def retrieve_sanitized_file(self, data_id):
+        endpoint_details = self.api_endpoints["sanitized_file"]
+        metadefender_url = self.server_url + endpoint_details["endpoint"].format(data_id=data_id)
+
+        print("Retrieve sanitized file ({0}) from MetaDefender".format(data_id))   
+        
+        response = requests.request(endpoint_details["type"], metadefender_url)
+        raw_file = response.text
+        
+        return raw_file
