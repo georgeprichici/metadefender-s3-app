@@ -20,7 +20,6 @@ def handler(event, context):
     bucket = obj_details["bucket"]
     obj_key = obj_details["obj_key"]
     
-    
     metadefender_core_url = os.environ['MetaDefenderCoreURL']
     metadefender_cloud_apikey = os.environ['MetaDefenderCloudAPIkey']
     integration_type = os.environ['MetaDefenderDeployment']
@@ -28,6 +27,13 @@ def handler(event, context):
     
     s3_client = MetaDefenderS3(bucket)
     md_api = MetaDefenderCoreAPI(metadefender_core_url) if (integration_type == "MetaDefenderCore") else MetaDefenderCloudAPI(metadefender_cloud_apikey)
+
+    analysis_status = s3_client.get_analysis_status(obj_key)
+
+    if analysis_status is not "":
+        # file already sanitized
+        # no need to redo the analysis
+        return
 
     download_path = ""  
     if md_api.supports_dowload_file:
