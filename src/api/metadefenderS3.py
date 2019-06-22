@@ -31,3 +31,16 @@ class MetaDefenderS3:
         
     def delete_file(self, filename):
         self.s3_client.delete_object(Bucket=self.bucket_name, Key=filename)
+
+    def upload_sanitized(self, filename, file):
+        response = self.s3_client.put_object(Body=file, Bucket=self.bucket_name, Key=filename)
+        print("Sanitized file uploaded: {0}".format(response))
+
+    def get_analysis_status(self, filename):
+        tags = self.s3_client.get_object_tagging(Bucket=self.bucket_name, Key=filename)
+
+        for tag in tags['TagSet']: 
+            if tag['Key'] == "metaDefenderResult":
+                return tag['Value']
+
+        return ""
