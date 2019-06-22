@@ -2,13 +2,25 @@ import json
 import os
 import boto3
 from api.metadefenderS3 import MetaDefenderS3
+from api.metadefenderCoreAPI import MetaDefenderCoreAPI
+from api.metadefenderCloudAPI import MetaDefenderCloudAPI
+
+def get_metadefender_api():
+
+    metadefender_core_url = os.environ['MetaDefenderCoreURL']
+    metadefender_cloud_apikey = os.environ['MetaDefenderCloudAPIkey']
+    integration_type = os.environ['MetaDefenderDeployment']
+    
+    md_api = MetaDefenderCoreAPI(metadefender_core_url) if (integration_type == "MetaDefenderCore") else MetaDefenderCloudAPI(metadefender_cloud_apikey)
+    return md_api
 
 def tag_files(bucket, filename, analysis_results):
 
     new_tags = {
         "analysisTimestamp": analysis_results["file_info"]["upload_timestamp"],
         "metaDefenderDataId": analysis_results["data_id"],
-        "metaDefenderResult": analysis_results["process_info"]["result"]
+        "metaDefenderResult": analysis_results["process_info"]["result"],
+        "action": analysis_results["process_info"]["post_processing"]["actions_ran"]
     }
     
     s3_client = MetaDefenderS3(bucket)
@@ -27,13 +39,27 @@ def delete_files(bucket, filename, analysis_results):
     return {"status": "done", "message": "file {0} deleted".format(filename)}
 
 def check_bucket_versioning(bucket_name, enable_versioning):
-    s3_client = boto3.client('s3')
-    bucket_versioning = s3_client.BucketVersioning(bucket_name)
+    s3 = boto3.resource('s3')
+    bucket_versioning = s3.BucketVersioning(bucket_name)
 
-    if bucket_versioning != "Enabled" and enable_versioning:
-        s3_client.enable()
+    if enable_versioning:    
+        bucket_versioning.enable()
 
 def replace_with_sanitized(bucket_name, filename, analysis_results):
+
+    
+    data_id = analysis_results["data_id"]
+    
+    if "Sanitized" in analysis_results["process_info"]["post_processing"]["actions_ran"]:
+        metadefender_api = get_metadefender_api()
+        sanitized_file = metadefender_api.retrieve_sanitized_file(data_id)
+        
+        s3_client = MetaDefenderS3(bucket_name)
+        s3_client.upload_sanitized(filename, sanitized_file)
+        tag_files(bucket_name, filename, analysis_results)
+    else:
+        print("File not sanitized, nothing to upload...")
+        return False
 
     return True
 
@@ -71,7 +97,6 @@ def handler(event, context):
         print("Remediate using method: {0}".format(remediation_type))
         remediation = remediation_dict[remediation_type]
         response = remediation(bucket, filename, response)
-
     
     return response
 
