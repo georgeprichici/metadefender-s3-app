@@ -38,7 +38,8 @@ class MetaDefenderCoreAPI:
         with open(filepath, 'rb') as payload:
             print("file read successfully")   
             headers = {
-                "filename": filename
+                "filename": filename, 
+                "callbackurl": analysis_callback_url
             }
             before_submission = datetime.datetime.now()                
             endpoint_details = self.api_endpoints["submit_file"]
@@ -58,17 +59,12 @@ class MetaDefenderCoreAPI:
             json_response["status"] = "ok" if ('data_id' in json_response) else "failed"
 
         if "data_id" not in json_response:
-            return {"error": json_response["error"]}
+            return {"error": json_response["error"]}        
 
-        data_id = json_response["data_id"]
-        response = self.retrieve_result(data_id)
-        payload = response.text
+        return json_response
 
-        # send all the details to the callback API 
-        requests.request('post', analysis_callback_url, data=payload)
-
-        return response.json()
-
+    # polling mechanism
+    # callbackurl replaced it, however is available starting with Core v4.17.0 
     def retrieve_result(self, data_id):
         print("MetaDefender > Retrieve result for {0}".format(data_id))
         
